@@ -9,11 +9,11 @@ import os
 from datetime import datetime
 
 from core import DetectionModel, FruitClassifier, DEFAULT_SETTINGS
-from core.config import PRODUCT_NAMES_VI, AGRICULTURAL_PRODUCTS
-from processing import ImageProcessor, preprocess_image
+from core.config import PRODUCT_NAMES_VI
+from processing import ImageProcessor
 from gui.styles import configure_styles
-from gui.components import ImageCanvas, StatisticsPanel, ProgressDialog
-from utils import save_results, calculate_statistics
+from gui.components import ImageCanvas, ProgressDialog
+from utils import save_results
 
 
 class FruitDetectionApp:
@@ -35,7 +35,6 @@ class FruitDetectionApp:
         self.processed_image = None  # Ảnh OpenCV
         self.pil_image = None        # Ảnh PIL để hiển thị
         self.detection_results = []
-        self.current_stats = {}
 
         # Cài đặt
         self.settings = DEFAULT_SETTINGS.copy()
@@ -107,7 +106,6 @@ class FruitDetectionApp:
         ttk.Label(self.control_frame, text="Loại sản phẩm:", style='Header.TLabel').pack(anchor=tk.W, pady=(0, 5))
 
         products = [
-
             ("Táo", "apple"),
             ("Chuối", "banana"),
             ("Cam", "orange"),
@@ -166,9 +164,7 @@ class FruitDetectionApp:
         buttons = [
             ("📁 TẢI ẢNH", self.load_image),
             ("🔍 PHÂN TÍCH", self.analyze_image),
-            ("📊 THỐNG KÊ", self.show_statistics),
             ("💾 LƯU KẾT QUẢ", self.save_results),
-            ("⚙️ TIỀN XỬ LÝ", self.preprocess_image),
             ("🔄 RESET", self.reset_app),
             ("❌ THOÁT", self.root.quit)
         ]
@@ -231,24 +227,17 @@ class FruitDetectionApp:
         # Tab thống kê
         self.create_statistics_tab()
 
-        # Tab tổng quan
-        self.create_overview_tab()
-
-        # Cấu hình resize
-        self.result_frame.columnconfigure(0, weight=1)
-        self.result_frame.rowconfigure(0, weight=1)
-
     def create_classification_tab(self):
         """Tạo tab phân loại"""
         class_tab = ttk.Frame(self.notebook)
         self.notebook.add(class_tab, text="Phân loại")
 
-        # Treeview
-        columns = ('STT', 'Loại SP', 'Chất lượng', 'Kích thước', 'Điểm số', 'Kích thước(px)')
+        # Treeview - BỎ CỘT KÍCH THƯỚC
+        columns = ('STT', 'Loại SP', 'Chất lượng', 'Điểm số')
         self.class_tree = ttk.Treeview(class_tab, columns=columns, show='headings', height=15)
 
         # Đặt độ rộng cột
-        col_widths = [50, 100, 100, 100, 80, 100]
+        col_widths = [50, 150, 150, 100]
         for col, width in zip(columns, col_widths):
             self.class_tree.heading(col, text=col)
             self.class_tree.column(col, width=width, anchor='center')
@@ -268,7 +257,7 @@ class FruitDetectionApp:
         class_tab.rowconfigure(0, weight=1)
 
     def create_statistics_tab(self):
-        """Tạo tab thống kê"""
+        """Tạo tab thống kê đơn giản"""
         stats_tab = ttk.Frame(self.notebook)
         self.notebook.add(stats_tab, text="Thống kê")
 
@@ -292,36 +281,6 @@ class FruitDetectionApp:
             command=self.copy_statistics,
             width=10
         ).pack(side=tk.RIGHT)
-
-    def create_overview_tab(self):
-        """Tạo tab tổng quan"""
-        overview_tab = ttk.Frame(self.notebook)
-        self.notebook.add(overview_tab, text="Tổng quan")
-
-        # Tạo panel thống kê
-        self.stats_panel = StatisticsPanel(overview_tab)
-        frame = self.stats_panel.get_frame()
-        frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-
-        # Thêm các thống kê
-        self.stats_panel.add_statistic('total', 'Tổng số sản phẩm:', 0, 0, color='dark blue')
-        self.stats_panel.add_statistic('quality_good', 'Sản phẩm chất lượng:', 1, 0, color='green')
-        self.stats_panel.add_statistic('defect_rate', 'Tỷ lệ hỏng:', 2, 0, color='red')
-        self.stats_panel.add_statistic('avg_score', 'Điểm chất lượng TB:', 3, 0, color='orange')
-
-        # Phân bố kích thước
-        ttk.Label(frame, text="Phân bố kích thước:",
-                 font=('Arial', 10, 'bold')).grid(row=4, column=0, sticky=tk.W, pady=(10, 5))
-
-        self.size_stats_text = tk.Text(frame, width=40, height=6, font=('Arial', 9))
-        self.size_stats_text.grid(row=5, column=0, columnspan=2, sticky=(tk.W, tk.E), padx=5)
-
-        # Phân bố chất lượng
-        ttk.Label(frame, text="Phân bố chất lượng:",
-                 font=('Arial', 10, 'bold')).grid(row=6, column=0, sticky=tk.W, pady=(10, 5))
-
-        self.quality_stats_text = tk.Text(frame, width=40, height=6, font=('Arial', 9))
-        self.quality_stats_text.grid(row=7, column=0, columnspan=2, sticky=(tk.W, tk.E), padx=5)
 
     def load_image(self):
         """Tải ảnh từ file"""
@@ -366,40 +325,6 @@ class FruitDetectionApp:
 
         # Xóa text widgets
         self.stats_text.delete(1.0, tk.END)
-        self.size_stats_text.delete(1.0, tk.END)
-        self.quality_stats_text.delete(1.0, tk.END)
-
-        # Reset statistics panel
-        self.stats_panel.update_statistic('total', '0')
-        self.stats_panel.update_statistic('quality_good', '0')
-        self.stats_panel.update_statistic('defect_rate', '0%')
-        self.stats_panel.update_statistic('avg_score', '0.00')
-
-    def preprocess_image(self):
-        """Tiền xử lý ảnh"""
-        if not self.image_path:
-            messagebox.showwarning("Cảnh báo", "Vui lòng tải ảnh trước!")
-            return
-
-        try:
-            self.update_status("Đang tiền xử lý ảnh...")
-
-            # Tiền xử lý
-            processed_cv2 = preprocess_image(self.image_path)
-            self.processed_image = processed_cv2
-
-            # Chuyển sang PIL để hiển thị
-            processed_rgb = cv2.cvtColor(processed_cv2, cv2.COLOR_BGR2RGB)
-            pil_image = Image.fromarray(processed_rgb)
-
-            # Hiển thị
-            self.image_canvas.display_pil_image(pil_image)
-
-            self.update_status("Đã tiền xử lý ảnh thành công")
-
-        except Exception as e:
-            messagebox.showerror("Lỗi", f"Tiền xử lý thất bại: {str(e)}")
-            self.update_status("Lỗi khi tiền xử lý")
 
     def analyze_image(self):
         """Phân tích và phân loại sản phẩm"""
@@ -428,7 +353,7 @@ class FruitDetectionApp:
             # Phân tích ảnh
             result = self.image_processor.analyze(
                 self.image_path,
-                self.processed_image,
+                None,  # Không dùng processed_image
                 settings
             )
 
@@ -452,8 +377,20 @@ class FruitDetectionApp:
             self.update_results_table()
             self.update_statistics()
 
+            # Tính số lượng từng loại
+            class_counts = {}
+            for result in self.detection_results:
+                class_name = result['class']
+                class_counts[class_name] = class_counts.get(class_name, 0) + 1
+
             total_count = len(self.detection_results)
-            self.update_status(f"Đã phân tích {total_count} sản phẩm")
+            class_info = []
+            for class_name, count in sorted(class_counts.items(), key=lambda x: x[1], reverse=True):
+                class_name_vn = PRODUCT_NAMES_VI.get(class_name, class_name)
+                percentage = (count / total_count * 100) if total_count > 0 else 0
+                class_info.append(f"{class_name_vn}: {count}")
+
+            self.update_status(f"Đã phân tích {total_count} sản phẩm ({', '.join(class_info)})")
 
             progress.update_message("Phân tích hoàn tất!")
 
@@ -470,7 +407,7 @@ class FruitDetectionApp:
         for item in self.class_tree.get_children():
             self.class_tree.delete(item)
 
-        # Thêm dữ liệu mới
+        # Thêm dữ liệu mới - BỎ CỘT KÍCH THƯỚC
         for i, result in enumerate(self.detection_results, 1):
             # Lấy tên tiếng Việt
             class_name_vi = PRODUCT_NAMES_VI.get(result['class'], result['class'])
@@ -479,16 +416,14 @@ class FruitDetectionApp:
             # Tạo tag cho màu nền
             tag = f"quality_{result['quality']}"
             self.class_tree.tag_configure(tag,
-                background=self.get_quality_color_hex(result['quality']))
+                                          background=self.get_quality_color_hex(result['quality']))
 
-            # Chèn dữ liệu
+            # Chèn dữ liệu - CHỈ CÒN 4 CỘT
             self.class_tree.insert('', 'end', values=(
                 i,
                 class_name_vi,
                 quality_vi,
-                result['size_category'],
-                f"{result['quality_score']:.2f}",
-                f"{result['size_px']:.0f}"
+                f"{result['quality_score']:.2f}"
             ), tags=(tag,))
 
     def get_quality_color_hex(self, quality):
@@ -497,78 +432,170 @@ class FruitDetectionApp:
         return QUALITY_COLORS.get(quality, '#FFFFFF')
 
     def update_statistics(self):
-        """Cập nhật thống kê"""
+        """Cập nhật thống kê đơn giản"""
         if not self.detection_results:
             return
 
-        # Tính toán thống kê
-        self.current_stats = calculate_statistics(self.detection_results)
+        # Tính toán thống kê cơ bản
+        total = len(self.detection_results)
 
-        # Cập nhật statistics panel
-        self.stats_panel.update_statistic('total', self.current_stats['total'])
-        self.stats_panel.update_statistic('quality_good',
-            self.current_stats.get('quality_good', 0))
-        self.stats_panel.update_statistic('defect_rate',
-            f"{self.current_stats.get('defect_rate', 0):.1f}%")
-        self.stats_panel.update_statistic('avg_score',
-            f"{self.current_stats.get('avg_quality_score', 0):.2f}")
+        # Đếm theo loại sản phẩm
+        class_counts = {}
+        quality_counts = {}
 
-        # Cập nhật phân bố kích thước
-        self.size_stats_text.delete(1.0, tk.END)
-        if 'size_counts' in self.current_stats:
-            for size, count in self.current_stats['size_counts'].items():
-                percentage = (count / self.current_stats['total'] * 100) if self.current_stats['total'] > 0 else 0
-                self.size_stats_text.insert(tk.END,
-                    f"{size}: {count} ({percentage:.1f}%)\n")
+        for result in self.detection_results:
+            # Loại sản phẩm
+            class_name = result['class']
+            class_counts[class_name] = class_counts.get(class_name, 0) + 1
 
-        # Cập nhật phân bố chất lượng
-        self.quality_stats_text.delete(1.0, tk.END)
-        if 'quality_counts' in self.current_stats:
-            for quality, count in self.current_stats['quality_counts'].items():
-                quality_vi = self.classifier.get_quality_name_vi(quality)
-                percentage = (count / self.current_stats['total'] * 100) if self.current_stats['total'] > 0 else 0
-                self.quality_stats_text.insert(tk.END,
-                    f"{quality_vi}: {count} ({percentage:.1f}%)\n")
+            # Chất lượng
+            quality = result['quality']
+            quality_counts[quality] = quality_counts.get(quality, 0) + 1
 
-        # Cập nhật tab thống kê
+        # Tính điểm chất lượng trung bình
+        total_score = sum(result['quality_score'] for result in self.detection_results)
+        avg_score = total_score / total if total > 0 else 0
+
+        # Đếm sản phẩm chất lượng (chín/tốt)
+        quality_good = quality_counts.get('ripe', 0) + quality_counts.get('good', 0)
+        defect_count = quality_counts.get('bad', 0) + quality_counts.get('rotten', 0)
+        defect_rate = (defect_count / total * 100) if total > 0 else 0
+
+        # Lưu thống kê cho sử dụng sau
+        self.current_stats = {
+            'total': total,
+            'class_counts': class_counts,
+            'quality_counts': quality_counts,
+            'avg_quality_score': avg_score,
+            'quality_good': quality_good,
+            'defect_rate': defect_rate
+        }
+
+        # Tạo văn bản thống kê
         stats_text = self.generate_statistics_text()
+
+        # Hiển thị
         self.stats_text.delete(1.0, tk.END)
         self.stats_text.insert(1.0, stats_text)
 
     def generate_statistics_text(self):
-        """Tạo văn bản thống kê"""
-        if not self.current_stats:
+        """Tạo văn bản thống kê chi tiết"""
+        if not hasattr(self, 'current_stats') or not self.current_stats:
             return "Chưa có dữ liệu thống kê"
 
         stats = self.current_stats
+        total = stats.get('total', 0)
+        class_counts = stats.get('class_counts', {})
+        quality_counts = stats.get('quality_counts', {})
 
-        text = "=" * 50 + "\n"
+        text = "=" * 60 + "\n"
         text += "THỐNG KÊ PHÂN LOẠI SẢN PHẨM\n"
-        text += "=" * 50 + "\n\n"
+        text += "=" * 60 + "\n\n"
 
         text += f"Thời gian: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        text += f"Tổng số sản phẩm: {stats['total']}\n"
-        text += f"Loại sản phẩm: {PRODUCT_NAMES_VI.get(self.product_var.get(), self.product_var.get())}\n\n"
+        text += f"Tổng số sản phẩm: {total}\n"
+        text += f"Số loại sản phẩm: {len(class_counts)}\n"
+        text += f"Loại sản phẩm chính: {PRODUCT_NAMES_VI.get(self.product_var.get(), self.product_var.get())}\n\n"
 
-        if 'quality_counts' in stats and stats['quality_counts']:
-            text += "--- PHÂN LOẠI THEO CHẤT LƯỢNG ---\n"
-            for quality, count in sorted(stats['quality_counts'].items()):
+        # THỐNG KÊ CHI TIẾT TỪNG LOẠI
+        if class_counts:
+            text += "=" * 60 + "\n"
+            text += "THỐNG KÊ CHI TIẾT TỪNG LOẠI SẢN PHẨM\n"
+            text += "=" * 60 + "\n\n"
+
+            for class_name, count in sorted(class_counts.items(), key=lambda x: x[1], reverse=True):
+                class_name_vn = PRODUCT_NAMES_VI.get(class_name, class_name)
+                percentage = (count / total * 100) if total > 0 else 0
+                text += f"【{class_name_vn.upper()}】\n"
+                text += f"  Số lượng: {count} ({percentage:.1f}%)\n"
+
+                # Tính chất lượng cho từng loại
+                class_detections = [d for d in self.detection_results if d['class'] == class_name]
+                if class_detections:
+                    # Đếm chất lượng trong loại này
+                    class_quality_counts = {}
+                    class_total_score = 0
+
+                    for det in class_detections:
+                        quality = det['quality']
+                        class_quality_counts[quality] = class_quality_counts.get(quality, 0) + 1
+                        class_total_score += det['quality_score']
+
+                    # Hiển thị chất lượng
+                    if class_quality_counts:
+                        text += "  Chất lượng:\n"
+                        for quality, q_count in sorted(class_quality_counts.items()):
+                            quality_vi = self.classifier.get_quality_name_vi(quality)
+                            q_percentage = (q_count / count * 100) if count > 0 else 0
+                            text += f"    • {quality_vi:<10}: {q_count:3d} ({q_percentage:5.1f}%)\n"
+
+                    # Điểm trung bình của loại này
+                    class_avg_score = class_total_score / count if count > 0 else 0
+                    text += f"  Điểm chất lượng TB: {class_avg_score:.2f}/1.0\n"
+
+                text += "\n"
+
+        # TỔNG HỢP CHẤT LƯỢNG
+        if quality_counts:
+            text += "=" * 60 + "\n"
+            text += "TỔNG HỢP PHÂN LOẠI THEO CHẤT LƯỢNG\n"
+            text += "=" * 60 + "\n"
+
+            for quality, count in sorted(quality_counts.items()):
                 quality_vi = self.classifier.get_quality_name_vi(quality)
-                percentage = (count / stats['total'] * 100) if stats['total'] > 0 else 0
-                text += f"  {quality_vi:15s}: {count:3d} ({percentage:5.1f}%)\n"
+                percentage = (count / total * 100) if total > 0 else 0
+                text += f"  {quality_vi:<15}: {count:3d} ({percentage:5.1f}%)\n"
 
-        if 'size_counts' in stats and stats['size_counts']:
-            text += "\n--- PHÂN LOẠI THEO KÍCH THƯỚC ---\n"
-            for size, count in sorted(stats['size_counts'].items()):
-                percentage = (count / stats['total'] * 100) if stats['total'] > 0 else 0
-                text += f"  {size:15s}: {count:3d} ({percentage:5.1f}%)\n"
+        # CHỈ SỐ TỔNG QUAN
+        text += "\n" + "=" * 60 + "\n"
+        text += "CHỈ SỐ TỔNG QUAN\n"
+        text += "=" * 60 + "\n"
 
-        text += f"\n--- TỔNG HỢP ---\n"
-        text += f"  Điểm chất lượng TB: {stats.get('avg_quality_score', 0):.2f}/1.0\n"
-        text += f"  Tỷ lệ hỏng:        {stats.get('defect_rate', 0):.1f}%\n"
-        text += f"  Sản phẩm chất lượng: {stats.get('quality_good', 0)}/{stats['total']}\n"
+        text += f"  Tổng số sản phẩm:          {total:3d}\n"
+        text += f"  Số loại sản phẩm:          {len(class_counts):3d}\n"
+        text += f"  Sản phẩm chất lượng:       {stats.get('quality_good', 0):3d}\n"
+        text += f"  Tỷ lệ hỏng:                {stats.get('defect_rate', 0):5.1f}%\n"
+        text += f"  Điểm chất lượng trung bình: {stats.get('avg_quality_score', 0):5.2f}/1.0\n"
+
+        # KẾT LUẬN
+        text += "\n" + "=" * 60 + "\n"
+        text += "KẾT LUẬN\n"
+        text += "=" * 60 + "\n"
+
+        defect_rate = stats.get('defect_rate', 0)
+        if defect_rate < 5:
+            text += "✅ CHẤT LƯỢNG TỐT\n"
+            text += "   • Tỷ lệ hỏng thấp (<5%)\n"
+            text += "   • Sản phẩm đạt yêu cầu xuất khẩu\n"
+            text += "   • Có thể đóng gói và phân phối ngay\n"
+        elif defect_rate < 20:
+            text += "⚠️  CHẤT LƯỢNG TRUNG BÌNH\n"
+            text += "   • Tỷ lệ hỏng vừa phải (5-20%)\n"
+            text += "   • Cần kiểm tra và phân loại lại\n"
+            text += "   • Có thể sử dụng cho thị trường nội địa\n"
+        else:
+            text += "❌ CHẤT LƯỢNG KÉM\n"
+            text += "   • Tỷ lệ hỏng cao (>20%)\n"
+            text += "   • Cần xử lý và loại bỏ sản phẩm hỏng\n"
+            text += "   • Không đạt tiêu chuẩn phân phối\n"
+
+        # Đề xuất xử lý theo số lượng từng loại
+        text += "\n" + "-" * 40 + "\n"
+        text += "ĐỀ XUẤT XỬ LÝ:\n"
+        text += "-" * 40 + "\n"
+
+        if class_counts:
+            for class_name, count in sorted(class_counts.items(), key=lambda x: x[1], reverse=True):
+                class_name_vn = PRODUCT_NAMES_VI.get(class_name, class_name)
+                text += f"• {class_name_vn}: {count} sản phẩm\n"
+
+        text += "\n" + "=" * 60 + "\n"
+        text += f"Báo cáo được tạo lúc: {datetime.now().strftime('%H:%M:%S %d/%m/%Y')}\n"
+        text += "Hệ thống phân loại sản phẩm nông nghiệp\n"
+        text += "=" * 60
 
         return text
+
 
     def copy_statistics(self):
         """Copy thống kê vào clipboard"""
@@ -578,44 +605,18 @@ class FruitDetectionApp:
             self.root.clipboard_append(stats_text)
             self.update_status("Đã copy thống kê vào clipboard")
 
-    def show_statistics(self):
-        """Hiển thị thống kê chi tiết"""
-        if not self.detection_results:
-            messagebox.showinfo("Thông tin", "Chưa có dữ liệu thống kê")
-            return
-
-        # Chuyển sang tab thống kê
-        self.notebook.select(1)
-
     def save_results(self):
-        """Lưu kết quả phân tích - ĐÃ SỬA LỖI TRÙNG TÊN"""
+        """Lưu kết quả phân tích"""
         try:
-            # DEBUG: Kiểm tra dữ liệu
-            print("\n" + "=" * 50)
-            print("🔄 DEBUG: Kiểm tra dữ liệu trước khi lưu")
-            print("=" * 50)
-            print(f"1. processed_image is None: {self.processed_image is None}")
-            print(f"2. has detection_results: {hasattr(self, 'detection_results')}")
-            if hasattr(self, 'detection_results'):
-                print(f"3. detection_results type: {type(self.detection_results)}")
-                print(f"4. detection_results length: {len(self.detection_results) if self.detection_results else 0}")
-            print("=" * 50)
-
-            # KIỂM TRA ĐIỀU KIỆN
             if self.processed_image is None:
                 messagebox.showwarning("Cảnh báo", "Chưa có ảnh nào được xử lý! Vui lòng tải và phân tích ảnh trước.")
                 return
 
-            if not hasattr(self, 'detection_results') or self.detection_results is None:
+            if not hasattr(self, 'detection_results') or not self.detection_results:
                 messagebox.showwarning("Cảnh báo", "Chưa có kết quả phân tích! Vui lòng nhấn 'PHÂN TÍCH' trước.")
                 return
 
-            if len(self.detection_results) == 0:
-                messagebox.showwarning("Cảnh báo", "Không có sản phẩm nào được phát hiện!")
-                return
-
             # Lấy cài đặt
-            from datetime import datetime
             settings = {
                 'product_type': self.product_var.get(),
                 'quality_analysis': self.quality_var.get(),
@@ -624,63 +625,30 @@ class FruitDetectionApp:
                 'timestamp': datetime.now().isoformat()
             }
 
-            # Kiểm tra statistics
-            if not hasattr(self, 'current_stats') or not self.current_stats:
-                from utils.statistics import calculate_statistics
-                self.current_stats = calculate_statistics(self.detection_results)
-                print(f"✅ Đã tính toán statistics: {self.current_stats.get('total', 0)} sản phẩm")
-
-            # QUAN TRỌNG: Import đúng hàm từ utils với alias khác
-            from utils.file_utils import save_results as save_to_files
-
-            print("📤 Đang gọi hàm lưu kết quả...")
-            saved_files = save_to_files(
+            # Lưu kết quả
+            saved_files = save_results(
                 processed_image=self.processed_image,
                 detections=self.detection_results,
-                statistics=self.current_stats,
                 settings=settings,
                 original_image_path=self.image_path
             )
 
             if saved_files:
-                import os
                 file_count = len([v for v in saved_files.values() if v])
-                success_msg = f"✅ Đã lưu thành công {file_count} file!"
-
-                # Lấy thư mục lưu từ file đầu tiên
-                first_file = next((v for v in saved_files.values() if v), None)
-                if first_file:
-                    folder = os.path.dirname(first_file)
-                    success_msg += f"\n\n📁 Thư mục: {folder}"
-
-                    # Liệt kê các file đã lưu
-                    success_msg += "\n📄 Các file đã lưu:"
-                    for key, path in saved_files.items():
-                        if path and os.path.exists(path):
-                            file_name = os.path.basename(path)
-                            file_size = os.path.getsize(path) / 1024  # KB
-                            success_msg += f"\n• {file_name} ({file_size:.1f} KB)"
-
-                messagebox.showinfo("Thành công", success_msg)
+                messagebox.showinfo("Thành công", f"Đã lưu thành công {file_count} file kết quả!")
                 self.update_status(f"Đã lưu {file_count} file kết quả")
-
             else:
-                self.update_status("⚠️ Không lưu được file (có thể người dùng đã hủy)")
+                self.update_status("Không lưu được file kết quả")
 
         except Exception as e:
-            error_msg = f"Lỗi khi lưu file: {str(e)}"
-            print(f"❌ {error_msg}")
-            import traceback
-            traceback.print_exc()
-            messagebox.showerror("Lỗi", error_msg)
-            self.update_status("❌ Lỗi khi lưu file")
+            messagebox.showerror("Lỗi", f"Lỗi khi lưu file: {str(e)}")
+            self.update_status("Lỗi khi lưu file")
 
     def reset_app(self):
         """Reset ứng dụng"""
         self.image_path = None
         self.processed_image = None
         self.detection_results = []
-        self.current_stats = {}
 
         # Reset image canvas
         self.image_canvas.canvas.delete("all")
@@ -695,3 +663,35 @@ class FruitDetectionApp:
         """Cập nhật thanh trạng thái"""
         self.status_bar.config(text=message)
         self.root.update()
+
+    def show_statistics(self):
+        """Hiển thị thống kê chi tiết"""
+        if not self.detection_results:
+            messagebox.showinfo("Thông tin", "Chưa có dữ liệu thống kê")
+            return
+
+        # Tính toán số lượng từng loại
+        class_counts = {}
+        for result in self.detection_results:
+            class_name = result['class']
+            class_counts[class_name] = class_counts.get(class_name, 0) + 1
+
+        # Tạo message hiển thị nhanh
+        message = "📊 THỐNG KÊ SỐ LƯỢNG TỪNG LOẠI\n"
+        message += "=" * 40 + "\n"
+
+        total = len(self.detection_results)
+        for class_name, count in sorted(class_counts.items(), key=lambda x: x[1], reverse=True):
+            class_name_vn = PRODUCT_NAMES_VI.get(class_name, class_name)
+            percentage = (count / total * 100) if total > 0 else 0
+            message += f"• {class_name_vn:<10}: {count:3d} ({percentage:5.1f}%)\n"
+
+        message += "=" * 40 + "\n"
+        message += f"Tổng số: {total} sản phẩm\n"
+        message += f"Số loại: {len(class_counts)} loại"
+
+        # Hiển thị popup
+        messagebox.showinfo("Thống kê nhanh", message)
+
+        # Chuyển sang tab thống kê
+        self.notebook.select(1)

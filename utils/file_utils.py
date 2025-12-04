@@ -1,22 +1,22 @@
 """
-Tiện ích xử lý file
+Tiện ích xử lý file - Bỏ JSON, chỉ lưu Excel và ảnh
 """
 import os
-import json
 import cv2
 import numpy as np
 from datetime import datetime
 import tkinter.filedialog as filedialog
 import tkinter.messagebox as messagebox
-from pathlib import Path
+
+from openpyxl.utils import get_column_letter
 
 from core.config import OUTPUTS_DIR, PRODUCT_NAMES_VI, QUALITY_NAMES_VI
 
 
-def save_results(processed_image, detections, statistics, settings, original_image_path=None):
+def save_results(processed_image, detections, settings, original_image_path=None):
     """
-    Lưu kết quả phân tích ảnh: ảnh processed, JSON, báo cáo, Excel, overlay
-    PHIÊN BẢN SỬA LỖI JSON SERIALIZATION
+    Lưu kết quả phân tích ảnh: ảnh processed, Excel, overlay
+    ĐÃ BỎ JSON VÀ TXT, THAY BẰNG EXCEL
     """
     try:
         # 1. Kiểm tra ảnh đã xử lý
@@ -59,93 +59,15 @@ def save_results(processed_image, detections, statistics, settings, original_ima
             results['original_image_path'] = original_copy_path
             print(f"✅ Đã lưu ảnh gốc: {original_copy_path}")
 
-        # 7. Lưu JSON (ĐÃ SỬA LỖI SERIALIZATION)
-        json_path = os.path.join(output_dir, f"{base_name}_data.json")
+        # 7. Tạo và lưu Excel thay cho JSON và TXT
+        excel_path = os.path.join(output_dir, f"{base_name}_results.xlsx")
+        if export_to_excel(detections, settings, excel_path):
+            results['excel_path'] = excel_path
+            print(f"✅ Đã lưu Excel: {excel_path}")
+        else:
+            print("⚠️ Không thể lưu file Excel")
 
-        # Chuyển đổi tất cả numpy types sang Python types
-        import numpy as np
-
-        def convert_for_json(obj):
-            """Chuyển đổi numpy types cho JSON serialization"""
-            if isinstance(obj, (np.integer, np.int32, np.int64)):
-                return int(obj)
-            elif isinstance(obj, (np.floating, np.float32, np.float64)):
-                return float(obj)
-            elif isinstance(obj, np.ndarray):
-                return obj.tolist()
-            elif isinstance(obj, dict):
-                return {key: convert_for_json(value) for key, value in obj.items()}
-            elif isinstance(obj, (list, tuple)):
-                return [convert_for_json(item) for item in obj]
-            else:
-                return obj
-
-        # Tạo dữ liệu JSON với conversion
-        results_data = {
-            'timestamp': datetime.now().isoformat(),
-            'total_count': len(detections),
-            'settings': convert_for_json(settings),
-            'detections': [],
-            'statistics': convert_for_json(statistics),
-            'file_info': {
-                'image_file': os.path.basename(image_path),
-                'json_file': os.path.basename(json_path),
-                'report_file': f"{base_name}_report.txt"
-            }
-        }
-
-        # Thêm detections với conversion
-        for i, det in enumerate(detections, 1):
-            # Lấy giá trị với fallback
-            bbox = det.get('bbox', [0, 0, 0, 0])
-            bbox = [convert_for_json(x) for x in bbox]
-
-            det_info = {
-                'id': i,
-                'class': str(det.get('class', 'unknown')),
-                'class_vn': str(PRODUCT_NAMES_VI.get(det.get('class', 'unknown'), det.get('class', 'unknown'))),
-                'quality': str(det.get('quality', 'unknown')),
-                'quality_vn': str(QUALITY_NAMES_VI.get(det.get('quality', 'unknown'), det.get('quality', 'unknown'))),
-                'size_category': str(det.get('size_category', 'Không xác định')),
-                'size_px': convert_for_json(det.get('size_px', 0)),
-                'quality_score': convert_for_json(det.get('quality_score', 0)),
-                'bbox': {
-                    'x1': bbox[0],
-                    'y1': bbox[1],
-                    'x2': bbox[2],
-                    'y2': bbox[3]
-                },
-                'width': convert_for_json(det.get('width', 0)),
-                'height': convert_for_json(det.get('height', 0)),
-                'area': convert_for_json(det.get('area', 0))
-            }
-            results_data['detections'].append(det_info)
-
-        # Chuyển đổi toàn bộ trước khi lưu
-        results_data = convert_for_json(results_data)
-
-        with open(json_path, 'w', encoding='utf-8') as f:
-            json.dump(results_data, f, indent=2, ensure_ascii=False)
-        results['json_path'] = json_path
-        print(f"✅ Đã lưu JSON: {json_path}")
-
-        # 8. Lưu báo cáo text
-        report_path = os.path.join(output_dir, f"{base_name}_report.txt")
-        generate_report(report_path, detections, statistics, settings)
-        results['report_path'] = report_path
-        print(f"✅ Đã lưu báo cáo: {report_path}")
-
-        # 9. Lưu Excel nếu pandas có
-        try:
-            import pandas as pd
-            excel_path = os.path.join(output_dir, f"{base_name}_data.xlsx")
-            if export_to_excel(detections, statistics, excel_path):
-                results['excel_path'] = excel_path
-                print(f"✅ Đã lưu Excel: {excel_path}")
-        except ImportError:
-            print("⚠️ Pandas không được cài đặt, bỏ qua export Excel")
-
-        # 10. Tạo overlay
+        # 8. Tạo overlay
         try:
             overlay_path = os.path.join(output_dir, f"{base_name}_overlay.jpg")
             if create_overlay_image(processed_image, detections, overlay_path):
@@ -154,11 +76,13 @@ def save_results(processed_image, detections, statistics, settings, original_ima
         except Exception as e:
             print(f"⚠️ Không tạo được overlay: {e}")
 
-        # 11. Thông báo thành công
+        # 9. Thông báo thành công
         file_count = len([k for k in results.keys() if k.endswith('_path')])
         messagebox.showinfo(
             "Thành công",
-            f"✅ Đã lưu {file_count} file kết quả vào:\n{output_dir}"
+            f"✅ Đã lưu {file_count} file kết quả vào:\n{output_dir}\n\n"
+            f"• {os.path.basename(image_path)}\n"
+            f"• {os.path.basename(excel_path)}"
         )
 
         return results
@@ -169,248 +93,351 @@ def save_results(processed_image, detections, statistics, settings, original_ima
         messagebox.showerror("Lỗi", f"Không thể lưu file: {e}")
         return None
 
-def generate_report(file_path, detections, statistics, settings):
-    """Tạo báo cáo text"""
-    with open(file_path, 'w', encoding='utf-8') as f:
-        f.write("=" * 60 + "\n")
-        f.write("BÁO CÁO PHÂN TÍCH SẢN PHẨM NÔNG NGHIỆP\n")
-        f.write("=" * 60 + "\n\n")
 
-        f.write(f"Thời gian: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-        f.write(f"Loại sản phẩm: {PRODUCT_NAMES_VI.get(settings.get('product_type', 'auto'), settings.get('product_type', 'auto'))}\n")
-        f.write(f"Ngưỡng tin cậy: {settings.get('confidence_threshold', 0.5):.2f}\n")
-        f.write(f"Phân loại chất lượng: {'Bật' if settings.get('quality_analysis', True) else 'Tắt'}\n")
-        f.write(f"Phân loại kích thước: {'Bật' if settings.get('size_analysis', True) else 'Tắt'}\n")
-        f.write(f"Tổng số sản phẩm: {len(detections)}\n\n")
-
-        f.write("CHI TIẾT PHÂN LOẠI:\n")
-        f.write("-" * 40 + "\n")
-        f.write(f"{'STT':>4} {'Loại SP':<12} {'Chất lượng':<15} {'Kích thước':<15} {'Điểm số':<10} {'Size(px)':<10}\n")
-        f.write("-" * 80 + "\n")
-
-        for i, result in enumerate(detections, 1):
-            class_name = PRODUCT_NAMES_VI.get(result['class'], result['class'])
-            quality_name = QUALITY_NAMES_VI.get(result['quality'], result['quality'])
-            f.write(f"{i:4d} {class_name:<12} {quality_name:<15} {result['size_category']:<15} "
-                   f"{result['quality_score']:<10.2f} {result['size_px']:<10.0f}\n")
-
-        f.write("\nTHỐNG KÊ TỔNG HỢP:\n")
-        f.write("-" * 40 + "\n")
-
-        if 'quality_counts' in statistics:
-            f.write("Phân bố chất lượng:\n")
-            for quality, count in statistics['quality_counts'].items():
-                quality_vn = QUALITY_NAMES_VI.get(quality, quality)
-                percentage = (count / len(detections) * 100) if detections else 0
-                f.write(f"  {quality_vn:<15}: {count:3d} ({percentage:5.1f}%)\n")
-
-        if 'size_counts' in statistics:
-            f.write("\nPhân bố kích thước:\n")
-            for size, count in statistics['size_counts'].items():
-                percentage = (count / len(detections) * 100) if detections else 0
-                f.write(f"  {size:<15}: {count:3d} ({percentage:5.1f}%)\n")
-
-        f.write("\nCHỈ SỐ CHẤT LƯỢNG:\n")
-        f.write("-" * 40 + "\n")
-        f.write(f"  Điểm chất lượng trung bình: {statistics.get('avg_quality_score', 0):.2f}/1.0\n")
-        f.write(f"  Tỷ lệ hỏng: {statistics.get('defect_rate', 0):.1f}%\n")
-        f.write(f"  Sản phẩm chất lượng: {statistics.get('quality_good', 0)}/{len(detections)}\n")
-        f.write(f"  Tỷ lệ chất lượng: {(statistics.get('quality_good', 0)/len(detections)*100) if detections else 0:.1f}%\n")
-
-        f.write("\nKẾT LUẬN:\n")
-        f.write("-" * 40 + "\n")
-        defect_rate = statistics.get('defect_rate', 0)
-        if defect_rate < 5:
-            f.write("  ✅ Chất lượng tốt, tỷ lệ hỏng thấp\n")
-        elif defect_rate < 20:
-            f.write("  ⚠️  Chất lượng trung bình, cần kiểm tra\n")
-        else:
-            f.write("  ❌ Chất lượng kém, tỷ lệ hỏng cao\n")
-
-        f.write(f"\n{'='*60}\n")
-        f.write("Hệ thống phân loại sản phẩm nông nghiệp\n")
-        f.write("Phiên bản 1.0.0\n")
-
-
-def export_to_excel(detections, statistics, excel_path):
-    """Xuất dữ liệu sang Excel"""
+def export_to_excel(detections, settings, excel_path):
+    """Xuất dữ liệu sang Excel - Phiên bản mở rộng thay thế JSON và TXT"""
     try:
         import pandas as pd
+        from openpyxl import load_workbook
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from openpyxl.utils import get_column_letter
 
-        # Tạo DataFrame cho detections
+        # TÍNH TOÁN THỐNG KÊ
+        total_count = len(detections)
+
+        # Đếm theo LOẠI SẢN PHẨM
+        class_counts = {}
+        class_quality_counts = {}
+        class_scores = {}  # Lưu điểm của từng loại
+
+        # Đếm theo chất lượng
+        quality_counts = {}
+        quality_scores = {}
+
+        for det in detections:
+            # Loại sản phẩm
+            class_name = det.get('class', 'unknown')
+            class_counts[class_name] = class_counts.get(class_name, 0) + 1
+
+            # Lưu điểm cho từng loại
+            if class_name not in class_scores:
+                class_scores[class_name] = []
+            class_scores[class_name].append(det.get('quality_score', 0))
+
+            # Chất lượng
+            quality = det.get('quality', 'unknown')
+            quality_counts[quality] = quality_counts.get(quality, 0) + 1
+
+            # Điểm chất lượng
+            if quality not in quality_scores:
+                quality_scores[quality] = []
+            quality_scores[quality].append(det.get('quality_score', 0))
+
+            # Thống kê chất lượng theo từng loại
+            if class_name not in class_quality_counts:
+                class_quality_counts[class_name] = {}
+            if quality not in class_quality_counts[class_name]:
+                class_quality_counts[class_name][quality] = 0
+            class_quality_counts[class_name][quality] += 1
+
+        # Tính điểm trung bình
+        avg_scores = {}
+        for quality, scores in quality_scores.items():
+            avg_scores[quality] = sum(scores) / len(scores) if scores else 0
+
+        # Tính điểm trung bình cho từng loại
+        class_avg_scores = {}
+        for class_name, scores in class_scores.items():
+            class_avg_scores[class_name] = sum(scores) / len(scores) if scores else 0
+
+        # Đếm sản phẩm chất lượng (chín)
+        quality_good = quality_counts.get('ripe', 0) + quality_counts.get('good', 0)
+        defect_count = quality_counts.get('bad', 0) + quality_counts.get('rotten', 0)
+        defect_rate = (defect_count / total_count * 100) if total_count > 0 else 0
+
+        # Tổng điểm trung bình
+        total_scores = [det.get('quality_score', 0) for det in detections]
+        avg_total_score = sum(total_scores) / len(total_scores) if total_scores else 0
+
+        # TẠO DATAFRAME CHO CHI TIẾT (BỎ CỘT KÍCH THƯỚC)
         detection_data = []
         for i, det in enumerate(detections, 1):
             detection_data.append({
                 'STT': i,
-                'Loại_SP': PRODUCT_NAMES_VI.get(det['class'], det['class']),
-                'Class_English': det['class'],
-                'Chất_lượng': QUALITY_NAMES_VI.get(det['quality'], det['quality']),
-                'Quality_English': det['quality'],
-                'Kích_thước': det['size_category'],
-                'Size_px': det['size_px'],
-                'Điểm_chất_lượng': det['quality_score'],
-                'Width': det['width'],
-                'Height': det['height'],
-                'Area': det['area'],
-                'X1': det['bbox'][0],
-                'Y1': det['bbox'][1],
-                'X2': det['bbox'][2],
-                'Y2': det['bbox'][3]
+                'Loại sản phẩm': PRODUCT_NAMES_VI.get(det['class'], det['class']),
+                'Class (English)': det['class'],
+                'Chất lượng': QUALITY_NAMES_VI.get(det['quality'], det['quality']),
+                'Quality (English)': det['quality'],
+                'Điểm chất lượng': det['quality_score']
             })
 
         df_detections = pd.DataFrame(detection_data)
 
-        # Tạo DataFrame cho statistics
-        stats_data = []
-        if 'quality_counts' in statistics:
-            for quality, count in statistics['quality_counts'].items():
-                stats_data.append({
-                    'Chỉ_số': 'Chất_lượng',
-                    'Loại': QUALITY_NAMES_VI.get(quality, quality),
-                    'Số_lượng': count,
-                    'Tỷ_lệ': f"{(count/len(detections)*100) if detections else 0:.1f}%"
-                })
+        # TẠO DATAFRAME CHO THỐNG KÊ SỐ LƯỢNG THEO LOẠI (CHI TIẾT)
+        class_stats_data = []
+        for class_name, count in class_counts.items():
+            class_name_vn = PRODUCT_NAMES_VI.get(class_name, class_name)
+            percentage = (count / total_count * 100) if total_count > 0 else 0
+            avg_score = class_avg_scores.get(class_name, 0)
 
-        if 'size_counts' in statistics:
-            for size, count in statistics['size_counts'].items():
-                stats_data.append({
-                    'Chỉ_số': 'Kích_thước',
-                    'Loại': size,
-                    'Số_lượng': count,
-                    'Tỷ_lệ': f"{(count/len(detections)*100) if detections else 0:.1f}%"
-                })
+            # Thống kê chất lượng cho từng loại
+            quality_details = []
+            if class_name in class_quality_counts:
+                for quality, q_count in class_quality_counts[class_name].items():
+                    quality_vn = QUALITY_NAMES_VI.get(quality, quality)
+                    q_percentage = (q_count / count * 100) if count > 0 else 0
+                    quality_details.append(f"{quality_vn}: {q_count} ({q_percentage:.1f}%)")
 
-        df_stats = pd.DataFrame(stats_data)
+            class_stats_data.append({
+                'Loại sản phẩm': class_name_vn,
+                'Class (English)': class_name,
+                'Số lượng': count,
+                'Tỷ lệ (%)': f"{percentage:.1f}%",
+                'Điểm chất lượng TB': f"{avg_score:.2f}",
+                'Phân bố chất lượng': ', '.join(quality_details)
+            })
 
-        # Tạo tổng hợp
+        df_class_stats = pd.DataFrame(class_stats_data)
+
+        # TẠO DATAFRAME TỔNG HỢP SỐ LƯỢNG LOẠI (DẠNG BẢNG ĐƠN GIẢN)
+        class_summary_data = []
+        for class_name, count in sorted(class_counts.items(), key=lambda x: x[1], reverse=True):
+            class_name_vn = PRODUCT_NAMES_VI.get(class_name, class_name)
+            percentage = (count / total_count * 100) if total_count > 0 else 0
+            avg_score = class_avg_scores.get(class_name, 0)
+
+            class_summary_data.append({
+                'STT': len(class_summary_data) + 1,
+                'Loại sản phẩm': class_name_vn,
+                'Số lượng': count,
+                'Tỷ lệ (%)': f"{percentage:.1f}%",
+                'Điểm TB': f"{avg_score:.2f}"
+            })
+
+        df_class_summary = pd.DataFrame(class_summary_data)
+
+        # TẠO DATAFRAME CHO THỐNG KÊ CHẤT LƯỢNG
+        stats_quality = []
+        for quality, count in quality_counts.items():
+            quality_vn = QUALITY_NAMES_VI.get(quality, quality)
+            percentage = (count / total_count * 100) if total_count > 0 else 0
+            avg_score = avg_scores.get(quality, 0)
+            stats_quality.append({
+                'Chỉ số': 'Chất lượng',
+                'Loại': quality_vn,
+                'Số lượng': count,
+                'Tỷ lệ (%)': f"{percentage:.1f}%",
+                'Điểm TB': f"{avg_score:.2f}"
+            })
+
+        df_stats_quality = pd.DataFrame(stats_quality)
+
+        # TẠO DATAFRAME CHO TỔNG HỢP
         summary_data = [{
-            'Tổng_số_SP': len(detections),
-            'Điểm_TB': statistics.get('avg_quality_score', 0),
-            'Tỷ_lệ_hỏng': f"{statistics.get('defect_rate', 0):.1f}%",
-            'SP_chất_lượng': statistics.get('quality_good', 0)
+            'Thông số': 'Tổng số sản phẩm',
+            'Giá trị': total_count,
+            'Đơn vị': 'sản phẩm'
+        }, {
+            'Thông số': 'Số loại sản phẩm',
+            'Giá trị': len(class_counts),
+            'Đơn vị': 'loại'
         }]
+
+        # Thêm số lượng từng loại vào tổng hợp
+        for class_name, count in sorted(class_counts.items(), key=lambda x: x[1], reverse=True):
+            class_name_vn = PRODUCT_NAMES_VI.get(class_name, class_name)
+            percentage = (count / total_count * 100) if total_count > 0 else 0
+            summary_data.append({
+                'Thông số': f'Số lượng {class_name_vn}',
+                'Giá trị': count,
+                'Đơn vị': 'sản phẩm',
+                'Tỷ lệ': f"{percentage:.1f}%"
+            })
+
+        summary_data.extend([
+            {
+                'Thông số': 'Sản phẩm chất lượng (chín/tốt)',
+                'Giá trị': quality_good,
+                'Đơn vị': 'sản phẩm'
+            }, {
+                'Thông số': 'Tỷ lệ hỏng',
+                'Giá trị': f"{defect_rate:.1f}%",
+                'Đơn vị': ''
+            }, {
+                'Thông số': 'Điểm chất lượng trung bình',
+                'Giá trị': f"{avg_total_score:.2f}",
+                'Đơn vị': '/1.0'
+            }, {
+                'Thông số': 'Loại sản phẩm chính',
+                'Giá trị': PRODUCT_NAMES_VI.get(settings.get('product_type', 'auto'),
+                                                settings.get('product_type', 'auto')),
+                'Đơn vị': ''
+            }, {
+                'Thông số': 'Ngưỡng tin cậy',
+                'Giá trị': f"{settings.get('confidence_threshold', 0.5):.2f}",
+                'Đơn vị': ''
+            }, {
+                'Thông số': 'Thời gian phân tích',
+                'Giá trị': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'Đơn vị': ''
+            }
+        ])
+
         df_summary = pd.DataFrame(summary_data)
 
-        # Ghi ra Excel
+        # GHI RA EXCEL VỚI ĐỊNH DẠNG
         with pd.ExcelWriter(excel_path, engine='openpyxl') as writer:
-            df_detections.to_excel(writer, sheet_name='Chi_tiết', index=False)
-            df_stats.to_excel(writer, sheet_name='Thống_kê', index=False)
-            df_summary.to_excel(writer, sheet_name='Tổng_hợp', index=False)
+            # Sheet 1: Chi tiết phân loại
+            df_detections.to_excel(writer, sheet_name='Chi tiết phân loại', index=False)
 
-            # Điều chỉnh độ rộng cột
-            for sheet_name in writer.sheets:
-                worksheet = writer.sheets[sheet_name]
-                for column in worksheet.columns:
-                    max_length = 0
-                    column_letter = column[0].column_letter
-                    for cell in column:
-                        try:
-                            if len(str(cell.value)) > max_length:
-                                max_length = len(str(cell.value))
-                        except:
-                            pass
-                    adjusted_width = min(max_length + 2, 30)
-                    worksheet.column_dimensions[column_letter].width = adjusted_width
+            # Sheet 2: Tổng hợp số lượng theo loại
+            df_class_summary.to_excel(writer, sheet_name='Số lượng từng loại', index=False)
 
+            # Sheet 3: Thống kê chi tiết theo loại
+            df_class_stats.to_excel(writer, sheet_name='Thống kê chi tiết từng loại', index=False)
+
+            # Sheet 4: Thống kê chất lượng
+            df_stats_quality.to_excel(writer, sheet_name='Thống kê chất lượng', index=False)
+
+            # Sheet 5: Tổng hợp
+            df_summary.to_excel(writer, sheet_name='Tổng hợp', index=False)
+
+            # Lấy workbook để định dạng
+            workbook = writer.book
+
+            # Định dạng các sheet
+            sheets_titles = {
+                'Chi tiết phân loại': "CHI TIẾT PHÂN LOẠI TỪNG SẢN PHẨM",
+                'Số lượng từng loại': "SỐ LƯỢNG TỪNG LOẠI SẢN PHẨM",
+                'Thống kê chi tiết từng loại': "THỐNG KÊ CHI TIẾT TỪNG LOẠI SẢN PHẨM",
+                'Thống kê chất lượng': "THỐNG KÊ PHÂN LOẠI THEO CHẤT LƯỢNG",
+                'Tổng hợp': "BÁO CÁO TỔNG HỢP PHÂN TÍCH"
+            }
+
+            for sheet_name, title in sheets_titles.items():
+                if sheet_name in workbook.sheetnames:
+                    ws = workbook[sheet_name]
+                    _format_excel_sheet(ws, title)
+
+            # Thêm bảng xếp hạng loại sản phẩm vào sheet tổng hợp
+            ws_total = workbook['Tổng hợp']
+            ws_total.append([])
+            ws_total.append(["BẢNG XẾP HẠNG SỐ LƯỢNG THEO LOẠI:"])
+
+            # Thêm header cho bảng xếp hạng
+            ws_total.append(["Hạng", "Loại sản phẩm", "Số lượng", "Tỷ lệ", "Điểm chất lượng TB"])
+
+            # Thêm dữ liệu xếp hạng
+            rank = 1
+            for class_name, count in sorted(class_counts.items(), key=lambda x: x[1], reverse=True):
+                class_name_vn = PRODUCT_NAMES_VI.get(class_name, class_name)
+                percentage = (count / total_count * 100) if total_count > 0 else 0
+                avg_score = class_avg_scores.get(class_name, 0)
+                ws_total.append([rank, class_name_vn, count, f"{percentage:.1f}%", f"{avg_score:.2f}"])
+                rank += 1
+
+            # Thêm phân tích chi tiết từng loại
+            ws_total.append([])
+            ws_total.append(["PHÂN TÍCH CHI TIẾT TỪNG LOẠI:"])
+
+            for class_name, count in sorted(class_counts.items(), key=lambda x: x[1], reverse=True):
+                class_name_vn = PRODUCT_NAMES_VI.get(class_name, class_name)
+                percentage = (count / total_count * 100) if total_count > 0 else 0
+                avg_score = class_avg_scores.get(class_name, 0)
+
+                # Phân tích chất lượng
+                if class_name in class_quality_counts:
+                    good_count = class_quality_counts[class_name].get('ripe', 0) + class_quality_counts[class_name].get(
+                        'good', 0)
+                    bad_count = class_quality_counts[class_name].get('bad', 0) + class_quality_counts[class_name].get(
+                        'rotten', 0)
+                    good_rate = (good_count / count * 100) if count > 0 else 0
+                    bad_rate = (bad_count / count * 100) if count > 0 else 0
+
+                    ws_total.append([f"• {class_name_vn} ({count} sản phẩm, {percentage:.1f}%)"])
+                    ws_total.append([f"  - Điểm chất lượng TB: {avg_score:.2f}/1.0"])
+                    ws_total.append([f"  - Chất lượng tốt: {good_count} ({good_rate:.1f}%)"])
+                    ws_total.append([f"  - Chất lượng hỏng: {bad_count} ({bad_rate:.1f}%)"])
+                    ws_total.append([])
+
+            ws_total.append(["KẾT LUẬN TỔNG QUAN:"])
+
+            if defect_rate < 5:
+                conclusion = "✅ CHẤT LƯỢNG TỐT - Tỷ lệ hỏng thấp (<5%). Sản phẩm đạt yêu cầu xuất khẩu."
+            elif defect_rate < 20:
+                conclusion = "⚠️ CHẤT LƯỢNG TRUNG BÌNH - Tỷ lệ hỏng vừa phải (5-20%). Cần kiểm tra và phân loại lại."
+            else:
+                conclusion = "❌ CHẤT LƯỢNG KÉM - Tỷ lệ hỏng cao (>20%). Cần xử lý và loại bỏ sản phẩm hỏng."
+
+            ws_total.append([conclusion])
+            ws_total.append([])
+            ws_total.append([f"Thời gian tạo báo cáo: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"])
+            ws_total.append(["Hệ thống phân loại sản phẩm nông nghiệp - Phiên bản 1.0"])
+
+        print(f"✅ File Excel đã được tạo với {len(detections)} bản ghi, {len(class_counts)} loại sản phẩm")
         return True
 
+    except ImportError:
+        messagebox.showerror("Lỗi",
+                             "Thiếu thư viện pandas hoặc openpyxl. Vui lòng cài đặt:\npip install pandas openpyxl")
+        return False
     except Exception as e:
-        print(f"Lỗi export Excel: {e}")
+        print(f"❌ Lỗi export Excel: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
+def _format_excel_sheet(worksheet, title):
+    """Định dạng worksheet Excel"""
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
-def export_to_pdf(detections, statistics, pdf_path):
-    """Xuất dữ liệu sang PDF"""
-    try:
-        from reportlab.lib.pagesizes import A4
-        from reportlab.lib import colors
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    # Thiết lập độ rộng cột tự động
+    for column in worksheet.columns:
+        max_length = 0
+        column_letter = column[0].column_letter
+        for cell in column:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = min(max_length + 2, 50)
+        worksheet.column_dimensions[column_letter].width = adjusted_width
 
-        doc = SimpleDocTemplate(pdf_path, pagesize=A4)
-        styles = getSampleStyleSheet()
-        story = []
+    # Định dạng tiêu đề
+    if worksheet.max_row > 0:
+        for cell in worksheet[1]:
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+            cell.alignment = Alignment(horizontal="center", vertical="center")
 
-        # Title
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=16,
-            spaceAfter=30,
-            alignment=1
-        )
-        story.append(Paragraph("BÁO CÁO PHÂN TÍCH SẢN PHẨM NÔNG NGHIỆP", title_style))
-        story.append(Spacer(1, 20))
+    # Thêm border cho tất cả cells
+    thin_border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
 
-        # Thông tin chung
-        info_style = ParagraphStyle(
-            'InfoStyle',
-            parent=styles['Normal'],
-            fontSize=10,
-            spaceAfter=6
-        )
+    for row in worksheet.iter_rows():
+        for cell in row:
+            cell.border = thin_border
+            if cell.row == 1:
+                continue
+            if cell.column == 1:  # Cột STT
+                cell.alignment = Alignment(horizontal="center")
+            elif isinstance(cell.value, (int, float)) and not isinstance(cell.value, bool):
+                cell.alignment = Alignment(horizontal="right")
 
-        story.append(Paragraph(f"Thời gian: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", info_style))
-        story.append(Paragraph(f"Tổng số sản phẩm: {len(detections)}", info_style))
-        story.append(Spacer(1, 20))
-
-        # Tạo table cho detections (chỉ 10 dòng đầu)
-        if detections:
-            table_data = [['STT', 'Loại SP', 'Chất lượng', 'Kích thước', 'Điểm số']]
-            for i, det in enumerate(detections[:10], 1):
-                table_data.append([
-                    str(i),
-                    PRODUCT_NAMES_VI.get(det['class'], det['class']),
-                    QUALITY_NAMES_VI.get(det['quality'], det['quality']),
-                    det['size_category'],
-                    f"{det['quality_score']:.2f}"
-                ])
-
-            if len(detections) > 10:
-                table_data.append(['...', '...', '...', '...', '...'])
-                table_data.append(['Tổng', f'{len(detections)} SP', '', '', ''])
-
-            table = Table(table_data, colWidths=[40, 80, 80, 80, 60])
-            table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black)
-            ]))
-
-            story.append(table)
-            story.append(Spacer(1, 20))
-
-        # Thống kê
-        if statistics:
-            stats_text = f"""
-            <b>THỐNG KÊ TỔNG HỢP:</b><br/>
-            • Điểm chất lượng trung bình: {statistics.get('avg_quality_score', 0):.2f}/1.0<br/>
-            • Tỷ lệ hỏng: {statistics.get('defect_rate', 0):.1f}%<br/>
-            • Sản phẩm chất lượng: {statistics.get('quality_good', 0)}/{len(detections)}<br/>
-            """
-            story.append(Paragraph(stats_text, styles['Normal']))
-
-        # Kết luận
-        conclusion = """
-        <br/><br/>
-        <b>KẾT LUẬN:</b><br/>
-        Báo cáo được tạo tự động bởi hệ thống phân loại sản phẩm nông nghiệp.<br/>
-        Kết quả có thể được sử dụng để đánh giá chất lượng và ra quyết định.<br/>
-        """
-        story.append(Paragraph(conclusion, styles['Normal']))
-
-        # Build PDF
-        doc.build(story)
-        return True
-
-    except Exception as e:
-        print(f"Lỗi export PDF: {e}")
-        return False
+    # Thêm title
+    if title:
+        worksheet.insert_rows(1)
+        worksheet.merge_cells(f'A1:{get_column_letter(worksheet.max_column)}1')
+        title_cell = worksheet['A1']
+        title_cell.value = title
+        title_cell.font = Font(bold=True, size=14, color="FFFFFF")
+        title_cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+        title_cell.alignment = Alignment(horizontal="center", vertical="center")
 
 
 def create_overlay_image(image, detections, output_path):
@@ -419,28 +446,69 @@ def create_overlay_image(image, detections, output_path):
         overlay = image.copy()
         h, w = image.shape[:2]
 
-        # Thêm watermark
-        cv2.putText(overlay, f"Total: {len(detections)}",
-                   (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-        cv2.putText(overlay, datetime.now().strftime("%Y-%m-%d %H:%M"),
-                   (10, h - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+        # Đặt màu cho các loại chất lượng
+        quality_colors = {
+            'ripe': (0, 255, 0),      # Xanh lá - Chín
+            'good': (0, 200, 100),    # Xanh lá nhạt - Tốt
+            'unripe': (255, 255, 0),  # Vàng - Xanh
+            'bad': (0, 165, 255),     # Cam - Hỏng nhẹ
+            'rotten': (0, 0, 255)     # Đỏ - Hỏng nặng
+        }
 
+        # Vẽ bounding boxes và thông tin
+        for i, det in enumerate(detections, 1):
+            bbox = det['bbox']
+            quality = det.get('quality', 'unknown')
+            color = quality_colors.get(quality, (255, 255, 255))
+
+            # Vẽ bounding box
+            cv2.rectangle(overlay,
+                         (int(bbox[0]), int(bbox[1])),
+                         (int(bbox[2]), int(bbox[3])),
+                         color, 2)
+
+            # Tạo label
+            label = f"{i}. {PRODUCT_NAMES_VI.get(det['class'], det['class'])} - {QUALITY_NAMES_VI.get(quality, quality)}"
+
+            # Vẽ background cho label
+            label_size, baseline = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+            cv2.rectangle(overlay,
+                         (int(bbox[0]), int(bbox[1]) - label_size[1] - 5),
+                         (int(bbox[0]) + label_size[0], int(bbox[1])),
+                         color, -1)
+
+            # Vẽ text
+            cv2.putText(overlay, label,
+                       (int(bbox[0]), int(bbox[1]) - 5),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
+        # Thêm watermark và thông tin
+        cv2.putText(overlay, f"Tổng: {len(detections)} sản phẩm",
+                   (10, 30), cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 255, 0), 2)
+
+        # Thêm legend chất lượng
+        y_offset = 60
+        for quality, color in quality_colors.items():
+            if quality in QUALITY_NAMES_VI:
+                label = f"{QUALITY_NAMES_VI[quality]}"
+                cv2.rectangle(overlay, (10, y_offset-15), (25, y_offset), color, -1)
+                cv2.putText(overlay, label,
+                           (30, y_offset),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                y_offset += 25
+
+        # Thêm timestamp
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+        cv2.putText(overlay, timestamp,
+                   (w - 200, h - 10),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
+        # Lưu ảnh
         cv2.imwrite(output_path, overlay)
         return True
     except Exception as e:
-        print(f"Lỗi tạo overlay: {e}")
+        print(f"⚠️ Không tạo được overlay: {e}")
         return False
-
-
-def load_results(json_path):
-    """Tải kết quả từ file JSON"""
-    try:
-        with open(json_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        return data
-    except Exception as e:
-        print(f"Lỗi tải file JSON: {e}")
-        return None
 
 
 def get_file_size(file_path):
@@ -466,7 +534,7 @@ def list_output_files(output_dir=None):
     try:
         for root, dirs, files in os.walk(output_dir):
             for file in files:
-                if file.endswith(('.jpg', '.png', '.json', '.txt', '.xlsx', '.pdf')):
+                if file.endswith(('.jpg', '.png', '.xlsx')):
                     file_path = os.path.join(root, file)
                     file_info = {
                         'name': file,
@@ -485,21 +553,19 @@ def list_output_files(output_dir=None):
         return []
 
 
-def convert_numpy_types(obj):
-    """Chuyển đổi numpy types sang Python native types cho JSON serialization"""
-    import numpy as np
-
-    if isinstance(obj, np.integer):
-        return int(obj)
-    elif isinstance(obj, np.floating):
-        return float(obj)
-    elif isinstance(obj, np.ndarray):
-        return obj.tolist()
-    elif isinstance(obj, dict):
-        return {key: convert_numpy_types(value) for key, value in obj.items()}
-    elif isinstance(obj, list):
-        return [convert_numpy_types(item) for item in obj]
-    elif isinstance(obj, tuple):
-        return tuple(convert_numpy_types(item) for item in obj)
-    else:
-        return obj
+def load_results(json_path):
+    """Tải kết quả từ file JSON (cho tương thích)"""
+    try:
+        import json
+        with open(json_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return data
+    except Exception as e:
+        print(f"⚠️ Lỗi tải file JSON: {e}")
+        # Trả về dict rỗng để tương thích
+        return {
+            'detections': [],
+            'statistics': {},
+            'settings': {},
+            'timestamp': ''
+        }
