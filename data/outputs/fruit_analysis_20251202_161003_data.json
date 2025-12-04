@@ -1,0 +1,152 @@
+{
+  "timestamp": "2025-12-02T16:10:30.649320",
+  "total_count": 3,
+  "settings": {
+    "product_type": "auto",
+    "quality_analysis": true,
+    "size_analysis": true,
+    "confidence_threshold": 0.5,
+    "timestamp": "2025-12-02T16:10:03.667754"
+  },
+  "detections": [
+    {
+      "id": 1,
+      "class": "apple",
+      "class_vn": "Táo",
+      "quality": "chin",
+      "quality_vn": "Chín",
+      "size_category": "Không xác định",
+      "size_px": 282.2259826660156,
+      "quality_score": 1.0,
+      "bbox": {
+        "x1": 86.8692855834961,
+        "y1": 407.8078918457031,
+        "x2": 355.880615234375,
+        "y2": 690.0338745117188
+      },
+      "width": 269.0113220214844,
+      "height": 282.2259826660156,
+      "area": 75921.984375
+    },
+    {
+      "id": 2,
+      "class": "orange",
+      "class_vn": "Cam",
+      "quality": "chin",
+      "quality_vn": "Chín",
+      "size_category": "Không xác định",
+      "size_px": 268.78338623046875,
+      "quality_score": 1.0,
+      "bbox": {
+        "x1": 328.6361389160156,
+        "y1": 388.5445556640625,
+        "x2": 554.9609375,
+        "y2": 657.3279418945312
+      },
+      "width": 226.32479858398438,
+      "height": 268.78338623046875,
+      "area": 60832.34765625
+    },
+    {
+      "id": 3,
+      "class": "banana",
+      "class_vn": "Chuối",
+      "quality": "chin",
+      "quality_vn": "Chín",
+      "size_category": "Không xác định",
+      "size_px": 392.03955078125,
+      "quality_score": 0.8999999999999999,
+      "bbox": {
+        "x1": 541.8362426757812,
+        "y1": 336.1777038574219,
+        "x2": 933.8757934570312,
+        "y2": 667.1160278320312
+      },
+      "width": 392.03955078125,
+      "height": 330.9383239746094,
+      "area": 129740.9140625
+    }
+  ],
+  "statistics": {
+    "total": 3,
+    "quality_counts": {
+      "chin": 3
+    },
+    "size_counts": {
+      "Không xác định": 3
+    },
+    "defect_count": 0,
+    "defect_rate": 0.0,
+    "avg_quality_score": 0.9666666666666667,
+    "quality_good": 3,
+    "quality_good_rate": 100.0,
+    "size_stats": {
+      "min": 268.78338623046875,
+      "max": 392.03955078125,
+      "mean": 314.3496398925781,
+      "std": 55.208499908447266,
+      "median": 282.2259826660156
+    },
+    "product_stats": {
+      "apple": {
+        "count": 1,
+        "qualities": {
+          "chin": 1
+        },
+        "sizes": {
+          "Không xác định": 1
+        }
+      },
+      "orange": {
+        "count": 1,
+        "qualities": {
+          "chin": 1
+        },
+        "sizes": {
+          "Không xác định": 1
+        }
+      },
+      "banana": {
+        "count": 1,
+        "qualities": {
+          "chin": 1
+        },
+        "sizes": {
+          "Không xác định": 1
+        }
+      }
+    },
+    "cv_size": 17.562768936157227,
+    "avg_scores_by_quality": {
+      "chin": 0.9666666666666667
+    },
+    "quality_scores": [
+      1.0,
+      1.0,
+      0.8999999999999999
+    ],
+    "size_values": [
+      282.2259826660156,
+      268.78338623046875,
+      392.03955078125
+    ],
+    "quality_distribution": {
+      "chin": {
+        "count": 3,
+        "percentage": 100.0,
+        "avg_score": 0.9666666666666667
+      }
+    },
+    "size_distribution": {
+      "Không xác định": {
+        "count": 3,
+        "percentage": 100.0
+      }
+    }
+  },
+  "file_info": {
+    "image_file": "fruit_analysis_20251202_161003_processed.jpg",
+    "json_file": "fruit_analysis_20251202_161003_data.json",
+    "report_file": "fruit_analysis_20251202_161003_report.txt"
+  }
+}

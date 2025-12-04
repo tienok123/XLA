@@ -1,0 +1,92 @@
+{
+  "timestamp": "2025-12-02T16:18:06.257339",
+  "total_count": 1,
+  "settings": {
+    "product_type": "auto",
+    "quality_analysis": true,
+    "size_analysis": true,
+    "confidence_threshold": 0.5,
+    "timestamp": "2025-12-02T16:18:03.728164"
+  },
+  "detections": [
+    {
+      "id": 1,
+      "class": "apple",
+      "class_vn": "Táo",
+      "quality": "chin",
+      "quality_vn": "Chín",
+      "size_category": "To",
+      "size_px": 96.55970764160156,
+      "quality_score": 0.8999999999999999,
+      "bbox": {
+        "x1": 48.553531646728516,
+        "y1": 28.908571243286133,
+        "x2": 145.1132354736328,
+        "y2": 122.72282409667969
+      },
+      "width": 96.55970764160156,
+      "height": 93.81425476074219,
+      "area": 9058.6767578125
+    }
+  ],
+  "statistics": {
+    "total": 1,
+    "quality_counts": {
+      "chin": 1
+    },
+    "size_counts": {
+      "To": 1
+    },
+    "defect_count": 0,
+    "defect_rate": 0.0,
+    "avg_quality_score": 0.8999999999999999,
+    "quality_good": 1,
+    "quality_good_rate": 100.0,
+    "size_stats": {
+      "min": 96.55970764160156,
+      "max": 96.55970764160156,
+      "mean": 96.55970764160156,
+      "std": 0,
+      "median": 96.55970764160156
+    },
+    "product_stats": {
+      "apple": {
+        "count": 1,
+        "qualities": {
+          "chin": 1
+        },
+        "sizes": {
+          "To": 1
+        }
+      }
+    },
+    "cv_size": 0.0,
+    "avg_scores_by_quality": {
+      "chin": 0.8999999999999999
+    },
+    "quality_scores": [
+      0.8999999999999999
+    ],
+    "size_values": [
+      96.55970764160156
+    ],
+    "quality_distribution": {
+      "chin": {
+        "count": 1,
+        "percentage": 100.0,
+        "avg_score": 0.8999999999999999
+      }
+    },
+    "size_distribution": {
+      "To": {
+        "count": 1,
+        "percentage": 100.0
+      }
+    }
+  },
+  "file_info": {
+    "image_file": "fruit_analysis_20251202_161803_processed.jpg",
+    "json_file": "fruit_analysis_20251202_161803_data.json",
+    "report_file": "fruit_analysis_20251202_161803_report.txt"
+  }
+}

@@ -1,0 +1,41 @@
+============================================================
+BÁO CÁO PHÂN TÍCH SẢN PHẨM NÔNG NGHIỆP
+============================================================
+
+Thời gian: 2025-12-02 16:10:30
+Loại sản phẩm: auto
+Ngưỡng tin cậy: 0.50
+Phân loại chất lượng: Bật
+Phân loại kích thước: Bật
+Tổng số sản phẩm: 3
+
+CHI TIẾT PHÂN LOẠI:
+----------------------------------------
+ STT Loại SP      Chất lượng      Kích thước      Điểm số    Size(px)  
+--------------------------------------------------------------------------------
+   1 Táo          Chín            Không xác định  1.00       282       
+   2 Cam          Chín            Không xác định  1.00       269       
+   3 Chuối        Chín            Không xác định  0.90       392       
+
+THỐNG KÊ TỔNG HỢP:
+----------------------------------------
+Phân bố chất lượng:
+  Chín           :   3 (100.0%)
+
+Phân bố kích thước:
+  Không xác định :   3 (100.0%)
+
+CHỈ SỐ CHẤT LƯỢNG:
+----------------------------------------
+  Điểm chất lượng trung bình: 0.97/1.0
+  Tỷ lệ hỏng: 0.0%
+  Sản phẩm chất lượng: 3/3
+  Tỷ lệ chất lượng: 100.0%
+
+KẾT LUẬN:
+----------------------------------------
+  ✅ Chất lượng tốt, tỷ lệ hỏng thấp
+
+============================================================
+Hệ thống phân loại sản phẩm nông nghiệp
+Phiên bản 1.0.0
