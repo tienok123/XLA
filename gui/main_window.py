@@ -22,6 +22,9 @@ class FruitDetectionApp:
         self.root.title("Hệ Thống Đếm Và Phân Loại Sản Phẩm Nông Nghiệp")
         self.root.geometry("1400x800")
 
+        # Tạo menu bar
+        self.create_menu_bar()
+
         # Cấu hình style
         configure_styles()
 
@@ -38,6 +41,7 @@ class FruitDetectionApp:
 
         # Cài đặt
         self.settings = DEFAULT_SETTINGS.copy()
+        self.settings['enable_preprocessing'] = True
 
         # Thiết lập UI
         self.setup_ui()
@@ -47,6 +51,119 @@ class FruitDetectionApp:
 
         # Thanh trạng thái
         self.update_status("Sẵn sàng - Hệ thống phân loại sản phẩm nông nghiệp")
+
+    def create_menu_bar(self):
+        """Tạo thanh menu"""
+        menubar = tk.Menu(self.root)
+        self.root.config(menu=menubar)
+
+        # Menu File
+        file_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="File", menu=file_menu)
+        file_menu.add_command(label="Tải ảnh...", command=self.load_image, accelerator="Ctrl+O")
+        file_menu.add_separator()
+        file_menu.add_command(label="Lưu kết quả...", command=self.save_results, accelerator="Ctrl+S")
+        file_menu.add_separator()
+        file_menu.add_command(label="Thoát", command=self.root.quit, accelerator="Ctrl+Q")
+
+        # Menu Xử lý
+        process_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Xử lý", menu=process_menu)
+        process_menu.add_command(label="Phân tích ảnh", command=self.analyze_image, accelerator="F5")
+        process_menu.add_command(label="Tiền xử lý ảnh...", command=self.show_preprocessing_preview)
+        process_menu.add_separator()
+        process_menu.add_command(label="Reset", command=self.reset_app, accelerator="Ctrl+R")
+
+        # Menu Cài đặt
+        settings_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Cài đặt", menu=settings_menu)
+
+        # Submenu tiền xử lý
+        preprocess_menu = tk.Menu(settings_menu, tearoff=0)
+        settings_menu.add_cascade(label="Tiền xử lý ảnh", menu=preprocess_menu)
+
+        # Các biến cho menu tiền xử lý
+        self.preprocess_vars = {
+            'resize': tk.BooleanVar(value=True),
+            'enhance_contrast': tk.BooleanVar(value=True),
+            'denoise': tk.BooleanVar(value=True),
+            'sharpen': tk.BooleanVar(value=False),
+            'normalize': tk.BooleanVar(value=True)
+        }
+
+        preprocess_menu.add_checkbutton(label="Resize ảnh", variable=self.preprocess_vars['resize'],
+                                       command=self.update_preprocessing_config)
+        preprocess_menu.add_checkbutton(label="Tăng cường tương phản", variable=self.preprocess_vars['enhance_contrast'],
+                                       command=self.update_preprocessing_config)
+        preprocess_menu.add_checkbutton(label="Khử nhiễu", variable=self.preprocess_vars['denoise'],
+                                       command=self.update_preprocessing_config)
+        preprocess_menu.add_checkbutton(label="Làm sắc nét", variable=self.preprocess_vars['sharpen'],
+                                       command=self.update_preprocessing_config)
+        preprocess_menu.add_checkbutton(label="Chuẩn hóa", variable=self.preprocess_vars['normalize'],
+                                       command=self.update_preprocessing_config)
+
+        # Menu Trợ giúp
+        help_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Trợ giúp", menu=help_menu)
+        help_menu.add_command(label="Hướng dẫn sử dụng", command=self.show_help)
+        help_menu.add_command(label="Về ứng dụng", command=self.show_about)
+
+        # Phím tắt
+        self.root.bind('<Control-o>', lambda e: self.load_image())
+        self.root.bind('<Control-s>', lambda e: self.save_results())
+        self.root.bind('<Control-r>', lambda e: self.reset_app())
+        self.root.bind('<F5>', lambda e: self.analyze_image())
+        self.root.bind('<Control-q>', lambda e: self.root.quit())
+
+    def update_preprocessing_config(self):
+        """Cập nhật cấu hình tiền xử lý"""
+        config = {key: var.get() for key, var in self.preprocess_vars.items()}
+        self.image_processor.set_preprocessing_config(**config)
+        self.update_status("Đã cập nhật cấu hình tiền xử lý")
+
+    def show_help(self):
+        """Hiển thị hướng dẫn sử dụng"""
+        help_text = """
+        HƯỚNG DẪN SỬ DỤNG
+        
+        1. TẢI ẢNH
+           • Nhấn "Tải ảnh" hoặc Ctrl+O
+           • Chọn ảnh từ máy tính
+           
+        2. PHÂN TÍCH ẢNH
+           • Nhấn "Phân tích" hoặc F5
+           • Chờ hệ thống xử lý
+           
+        3. XEM KẾT QUẢ
+           • Tab "Phân loại": Xem chi tiết từng sản phẩm
+           • Tab "Thống kê": Xem tổng quan và báo cáo
+           
+        4. TIỀN XỬ LÝ ẢNH
+           • Bật/tắt trong menu Cài đặt
+           • Xem preview: Menu Xử lý → Tiền xử lý ảnh
+           
+        5. LƯU KẾT QUẢ
+           • Nhấn "Lưu kết quả" hoặc Ctrl+S
+           • Kết quả được lưu tự động vào thư mục output/
+        """
+        messagebox.showinfo("Hướng dẫn sử dụng", help_text)
+
+    def show_about(self):
+        """Hiển thị thông tin về ứng dụng"""
+        about_text = """
+        HỆ THỐNG ĐẾM VÀ PHÂN LOẠI SẢN PHẨM NÔNG NGHIỆP
+        
+        Phiên bản: 2.0
+        Tính năng:
+        • Phát hiện và phân loại trái cây tự động
+        • Đánh giá chất lượng (xanh/chín/hỏng)
+        • Phân loại theo kích thước
+        • Tiền xử lý ảnh thông minh
+        • Xuất báo cáo chi tiết
+        
+        © 2024 - Phát triển bởi AI AgriTech Team
+        """
+        messagebox.showinfo("Về ứng dụng", about_text)
 
     def load_model(self):
         """Tải mô hình YOLO"""
@@ -101,6 +218,7 @@ class FruitDetectionApp:
         self.quality_var = tk.BooleanVar(value=self.settings['enable_quality_analysis'])
         self.size_var = tk.BooleanVar(value=self.settings['enable_size_analysis'])
         self.confidence_var = tk.DoubleVar(value=self.settings['confidence_threshold'])
+        self.preprocess_var = tk.BooleanVar(value=True)
 
         # Phần chọn loại sản phẩm
         ttk.Label(self.control_frame, text="Loại sản phẩm:", style='Header.TLabel').pack(anchor=tk.W, pady=(0, 5))
@@ -137,6 +255,25 @@ class FruitDetectionApp:
             variable=self.size_var
         ).pack(anchor=tk.W, pady=2)
 
+        # Tiền xử lý ảnh
+        ttk.Label(self.control_frame, text="Tiền xử lý ảnh:",
+                 style='Header.TLabel').pack(anchor=tk.W, pady=(10, 5))
+
+        ttk.Checkbutton(
+            self.control_frame,
+            text="Bật tiền xử lý ảnh",
+            variable=self.preprocess_var
+        ).pack(anchor=tk.W, pady=2)
+
+        # Nút xem trước tiền xử lý
+        ttk.Button(
+            self.control_frame,
+            text="👁️ Xem trước tiền xử lý",
+            command=self.show_preprocessing_preview,
+            style='Secondary.TButton',
+            width=20
+        ).pack(pady=5, fill=tk.X)
+
         # Ngưỡng tin cậy
         ttk.Label(self.control_frame, text="Ngưỡng tin cậy:",
                  style='Header.TLabel').pack(anchor=tk.W, pady=(10, 5))
@@ -164,6 +301,7 @@ class FruitDetectionApp:
         buttons = [
             ("📁 TẢI ẢNH", self.load_image),
             ("🔍 PHÂN TÍCH", self.analyze_image),
+            ("📊 XEM THỐNG KÊ", self.show_statistics),
             ("💾 LƯU KẾT QUẢ", self.save_results),
             ("🔄 RESET", self.reset_app),
             ("❌ THOÁT", self.root.quit)
@@ -204,6 +342,16 @@ class FruitDetectionApp:
             width=12
         ).pack(side=tk.LEFT, padx=5)
 
+        # Nút xem ảnh gốc/ảnh đã xử lý
+        self.toggle_img_btn = ttk.Button(
+            img_control_frame,
+            text="🔄 Xem ảnh gốc",
+            command=self.toggle_original_processed,
+            width=15
+        )
+        self.toggle_img_btn.pack(side=tk.LEFT, padx=5)
+        self.showing_original = True
+
         # Thông tin ảnh
         self.image_info = ttk.Label(img_control_frame, text="Chưa có ảnh nào được tải")
         self.image_info.pack(side=tk.LEFT, padx=20)
@@ -211,6 +359,25 @@ class FruitDetectionApp:
         # Cấu hình resize
         self.image_frame.columnconfigure(0, weight=1)
         self.image_frame.rowconfigure(0, weight=1)
+
+    def toggle_original_processed(self):
+        """Chuyển đổi giữa xem ảnh gốc và ảnh đã xử lý"""
+        if not self.image_path:
+            return
+
+        if self.showing_original:
+            # Hiển thị ảnh đã xử lý
+            if self.processed_image is not None:
+                processed_rgb = cv2.cvtColor(self.processed_image, cv2.COLOR_BGR2RGB)
+                pil_image = Image.fromarray(processed_rgb)
+                self.image_canvas.display_pil_image(pil_image)
+                self.toggle_img_btn.config(text="🔄 Xem ảnh gốc")
+                self.showing_original = False
+        else:
+            # Hiển thị ảnh gốc
+            self.image_canvas.display_image(self.image_path)
+            self.toggle_img_btn.config(text="🔄 Xem ảnh đã xử lý")
+            self.showing_original = True
 
     def create_results_frame(self, parent):
         """Tạo frame kết quả"""
@@ -232,7 +399,7 @@ class FruitDetectionApp:
         class_tab = ttk.Frame(self.notebook)
         self.notebook.add(class_tab, text="Phân loại")
 
-        # Treeview - BỎ CỘT KÍCH THƯỚC
+        # Treeview
         columns = ('STT', 'Loại SP', 'Chất lượng', 'Điểm số')
         self.class_tree = ttk.Treeview(class_tab, columns=columns, show='headings', height=15)
 
@@ -282,6 +449,13 @@ class FruitDetectionApp:
             width=10
         ).pack(side=tk.RIGHT)
 
+        ttk.Button(
+            btn_frame,
+            text="📄 Xuất ra file",
+            command=self.export_statistics,
+            width=12
+        ).pack(side=tk.RIGHT, padx=5)
+
     def load_image(self):
         """Tải ảnh từ file"""
         file_types = [
@@ -300,20 +474,27 @@ class FruitDetectionApp:
             self.image_path = file_path
             self.processed_image = None
             self.detection_results = []
+            self.showing_original = True
 
             # Hiển thị ảnh
             if self.image_canvas.display_image(file_path):
                 # Lấy thông tin file
                 file_size = os.path.getsize(file_path) / 1024  # KB
+                img = Image.open(file_path)
+                width, height = img.size
                 file_info = (
                     f"File: {os.path.basename(file_path)} | "
-                    f"Size: {file_size:.1f} KB"
+                    f"Size: {file_size:.1f} KB | "
+                    f"Dimensions: {width}×{height}"
                 )
                 self.image_info.config(text=file_info)
                 self.update_status(f"Đã tải ảnh: {os.path.basename(file_path)}")
 
                 # Xóa kết quả cũ
                 self.clear_results()
+
+                # Cập nhật nút toggle
+                self.toggle_img_btn.config(state='normal' if self.processed_image else 'disabled')
             else:
                 messagebox.showerror("Lỗi", "Không thể tải ảnh. Vui lòng thử lại.")
 
@@ -345,10 +526,11 @@ class FruitDetectionApp:
                 'confidence': self.confidence_var.get(),
                 'product_type': self.product_var.get(),
                 'enable_quality': self.quality_var.get(),
-                'enable_size': self.size_var.get()
+                'enable_size': self.size_var.get(),
+                'enable_preprocessing': self.preprocess_var.get()
             }
 
-            progress.update_message("Đang phát hiện đối tượng...")
+            progress.update_message("Đang tiền xử lý ảnh...")
 
             # Phân tích ảnh
             result = self.image_processor.analyze(
@@ -364,14 +546,16 @@ class FruitDetectionApp:
             self.processed_image = result['processed_image']
             self.detection_results = result['detections']
 
-            # Chuyển sang PIL để hiển thị
-            processed_rgb = cv2.cvtColor(self.processed_image, cv2.COLOR_BGR2RGB)
-            pil_image = Image.fromarray(processed_rgb)
-
             progress.update_message("Đang cập nhật giao diện...")
 
             # Hiển thị ảnh đã xử lý
+            processed_rgb = cv2.cvtColor(self.processed_image, cv2.COLOR_BGR2RGB)
+            pil_image = Image.fromarray(processed_rgb)
             self.image_canvas.display_pil_image(pil_image)
+
+            # Cập nhật trạng thái toggle button
+            self.toggle_img_btn.config(state='normal', text="🔄 Xem ảnh gốc")
+            self.showing_original = False
 
             # Cập nhật UI
             self.update_results_table()
@@ -388,15 +572,17 @@ class FruitDetectionApp:
             for class_name, count in sorted(class_counts.items(), key=lambda x: x[1], reverse=True):
                 class_name_vn = PRODUCT_NAMES_VI.get(class_name, class_name)
                 percentage = (count / total_count * 100) if total_count > 0 else 0
-                class_info.append(f"{class_name_vn}: {count}")
+                class_info.append(f"{class_name_vn}: {count} ({percentage:.1f}%)")
 
-            self.update_status(f"Đã phân tích {total_count} sản phẩm ({', '.join(class_info)})")
+            self.update_status(f"Đã phân tích {total_count} sản phẩm. " + " | ".join(class_info))
 
             progress.update_message("Phân tích hoàn tất!")
 
         except Exception as e:
             messagebox.showerror("Lỗi", f"Phân tích thất bại: {str(e)}")
             self.update_status("Lỗi khi phân tích")
+            import traceback
+            traceback.print_exc()
 
         finally:
             progress.close()
@@ -407,7 +593,7 @@ class FruitDetectionApp:
         for item in self.class_tree.get_children():
             self.class_tree.delete(item)
 
-        # Thêm dữ liệu mới - BỎ CỘT KÍCH THƯỚC
+        # Thêm dữ liệu mới
         for i, result in enumerate(self.detection_results, 1):
             # Lấy tên tiếng Việt
             class_name_vi = PRODUCT_NAMES_VI.get(result['class'], result['class'])
@@ -418,7 +604,7 @@ class FruitDetectionApp:
             self.class_tree.tag_configure(tag,
                                           background=self.get_quality_color_hex(result['quality']))
 
-            # Chèn dữ liệu - CHỈ CÒN 4 CỘT
+            # Chèn dữ liệu
             self.class_tree.insert('', 'end', values=(
                 i,
                 class_name_vi,
@@ -596,7 +782,6 @@ class FruitDetectionApp:
 
         return text
 
-
     def copy_statistics(self):
         """Copy thống kê vào clipboard"""
         stats_text = self.stats_text.get(1.0, tk.END).strip()
@@ -604,6 +789,35 @@ class FruitDetectionApp:
             self.root.clipboard_clear()
             self.root.clipboard_append(stats_text)
             self.update_status("Đã copy thống kê vào clipboard")
+
+    def export_statistics(self):
+        """Xuất thống kê ra file text"""
+        if not hasattr(self, 'current_stats') or not self.current_stats:
+            messagebox.showwarning("Cảnh báo", "Chưa có dữ liệu thống kê để xuất!")
+            return
+
+        # Đề xuất tên file
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        default_filename = f"thong_ke_phan_loai_{timestamp}.txt"
+
+        file_path = filedialog.asksaveasfilename(
+            title="Lưu thống kê ra file",
+            defaultextension=".txt",
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
+            initialfile=default_filename
+        )
+
+        if file_path:
+            try:
+                stats_text = self.stats_text.get(1.0, tk.END)
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(stats_text)
+
+                self.update_status(f"Đã xuất thống kê ra file: {os.path.basename(file_path)}")
+                messagebox.showinfo("Thành công", f"Đã lưu thống kê vào:\n{file_path}")
+
+            except Exception as e:
+                messagebox.showerror("Lỗi", f"Không thể lưu file: {str(e)}")
 
     def save_results(self):
         """Lưu kết quả phân tích"""
@@ -621,6 +835,7 @@ class FruitDetectionApp:
                 'product_type': self.product_var.get(),
                 'quality_analysis': self.quality_var.get(),
                 'size_analysis': self.size_var.get(),
+                'preprocessing': self.preprocess_var.get(),
                 'confidence_threshold': float(self.confidence_var.get()),
                 'timestamp': datetime.now().isoformat()
             }
@@ -644,25 +859,98 @@ class FruitDetectionApp:
             messagebox.showerror("Lỗi", f"Lỗi khi lưu file: {str(e)}")
             self.update_status("Lỗi khi lưu file")
 
-    def reset_app(self):
-        """Reset ứng dụng"""
-        self.image_path = None
-        self.processed_image = None
-        self.detection_results = []
+    def show_preprocessing_preview(self):
+        """Hiển thị preview tiền xử lý ảnh"""
+        if not self.image_path:
+            messagebox.showwarning("Cảnh báo", "Vui lòng tải ảnh trước!")
+            return
 
-        # Reset image canvas
-        self.image_canvas.canvas.delete("all")
-        self.image_info.config(text="Chưa có ảnh nào được tải")
+        try:
+            # Lấy ảnh preview
+            previews = self.image_processor.get_preview_images(self.image_path)
 
-        # Clear results
-        self.clear_results()
+            if previews:
+                # Tạo cửa sổ mới
+                preview_window = tk.Toplevel(self.root)
+                preview_window.title("So sánh trước/sau tiền xử lý")
+                preview_window.geometry("1000x700")
 
-        self.update_status("Đã reset hệ thống")
+                # Tiêu đề
+                title_label = ttk.Label(
+                    preview_window,
+                    text="SO SÁNH TRƯỚC/SAU TIỀN XỬ LÝ ẢNH",
+                    style='Title.TLabel',
+                    font=('Arial', 14, 'bold')
+                )
+                title_label.pack(pady=10)
 
-    def update_status(self, message):
-        """Cập nhật thanh trạng thái"""
-        self.status_bar.config(text=message)
-        self.root.update()
+                # Chuyển ảnh comparison sang PIL để hiển thị
+                comparison_rgb = cv2.cvtColor(previews['comparison'], cv2.COLOR_BGR2RGB)
+                comparison_pil = Image.fromarray(comparison_rgb)
+
+                # Hiển thị
+                img_label = ttk.Label(preview_window)
+                img_label.pack(padx=10, pady=10)
+
+                # Scale ảnh để vừa cửa sổ
+                display_pil = comparison_pil.copy()
+                max_size = (900, 500)
+                display_pil.thumbnail(max_size, Image.Resampling.LANCZOS)
+
+                img_tk = ImageTk.PhotoImage(display_pil)
+                img_label.config(image=img_tk)
+                img_label.image = img_tk
+
+                # Thêm thông tin
+                info_frame = ttk.Frame(preview_window)
+                info_frame.pack(pady=10)
+
+                info_text = (
+                    f"Kích thước gốc: {previews['original'].shape[1]}×{previews['original'].shape[0]} pixels\n"
+                    f"Kích thước sau xử lý: {previews['processed'].shape[1]}×{previews['processed'].shape[0]} pixels\n"
+                    f"Tỷ lệ: {previews['original'].shape[1]/previews['processed'].shape[1]:.2f}:1"
+                )
+
+                info_label = ttk.Label(info_frame, text=info_text, justify=tk.CENTER)
+                info_label.pack()
+
+                # Thông tin các bước xử lý
+                steps_frame = ttk.LabelFrame(preview_window, text="CÁC BƯỚC TIỀN XỬ LÝ ĐƯỢC ÁP DỤNG", padding=10)
+                steps_frame.pack(pady=10, padx=20, fill=tk.X)
+
+                steps_text = []
+                for step, enabled in self.preprocess_vars.items():
+                    if enabled.get():
+                        step_name = {
+                            'resize': 'Resize ảnh về kích thước phù hợp',
+                            'enhance_contrast': 'Tăng cường tương phản (CLAHE)',
+                            'denoise': 'Khử nhiễu (Non-local Means)',
+                            'sharpen': 'Làm sắc nét (Unsharp Mask)',
+                            'normalize': 'Chuẩn hóa cường độ pixel'
+                        }.get(step, step)
+                        steps_text.append(f"✓ {step_name}")
+
+                if steps_text:
+                    for step in steps_text:
+                        ttk.Label(steps_frame, text=step).pack(anchor=tk.W, pady=2)
+                else:
+                    ttk.Label(steps_frame, text="Không có bước tiền xử lý nào được bật").pack()
+
+                # Nút đóng
+                ttk.Button(
+                    preview_window,
+                    text="Đóng",
+                    command=preview_window.destroy,
+                    width=20
+                ).pack(pady=20)
+
+            else:
+                messagebox.showerror("Lỗi", "Không thể tạo preview tiền xử lý")
+
+        except Exception as e:
+            messagebox.showerror("Lỗi", f"Không thể tạo preview: {str(e)}")
+            import traceback
+            traceback.print_exc()
 
     def show_statistics(self):
         """Hiển thị thống kê chi tiết"""
@@ -695,3 +983,34 @@ class FruitDetectionApp:
 
         # Chuyển sang tab thống kê
         self.notebook.select(1)
+
+    def reset_app(self):
+        """Reset ứng dụng"""
+        self.image_path = None
+        self.processed_image = None
+        self.detection_results = []
+        self.showing_original = True
+
+        # Reset image canvas
+        self.image_canvas.canvas.delete("all")
+        self.image_info.config(text="Chưa có ảnh nào được tải")
+
+        # Reset toggle button
+        self.toggle_img_btn.config(state='disabled', text="🔄 Xem ảnh gốc")
+
+        # Clear results
+        self.clear_results()
+
+        self.update_status("Đã reset hệ thống")
+
+    def update_status(self, message):
+        """Cập nhật thanh trạng thái"""
+        self.status_bar.config(text=message)
+        self.root.update()
+
+
+# Chạy ứng dụng
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = FruitDetectionApp(root)
+    root.mainloop()
